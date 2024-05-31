@@ -8,16 +8,29 @@ import {
   Image,
   PermissionsAndroid,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
-import MapView, {Marker} from 'react-native-maps';
-import Geolocation from 'react-native-geolocation-service';
+import MapView, {Circle, Marker, Polygon} from 'react-native-maps';
+
 import Geocoder from 'react-native-geocoding';
+import Geolocation from '@react-native-community/geolocation';
 import {GooglePlacesAutocomplete} from 'react-native-google-places-autocomplete';
+import geolib from 'geolib';
 
 // Initialize Geocoder with your API key
 Geocoder.init('AIzaSyDlnkg_c16HeGFpMk-Ey9l51ZGKIJnLDyA'); // Replace with your actual Geocoding API key
 
-function App(): React.JSX.Element {
+const App = () => {
+  //  30.740925, 76.778988
+
+  const circleCenter = {latitude: 30.740925, longitude: 76.778988}; // Circle center coordinates
+  const circleRadius = 50;
+  const parray = [
+    {latitude: 30.744, longitude: 76.784},
+    {latitude: 30.7445, longitude: 76.7845},
+    {latitude: 30.744, longitude: 76.785},
+    {latitude: 30.7435, longitude: 76.7845},
+  ];
   const mapRef = useRef(null);
 
   const [region, setRegion] = useState({
@@ -28,6 +41,9 @@ function App(): React.JSX.Element {
   });
 
   const [marker, setMarker] = useState(null);
+  const [geofence, setGeofence] = useState(null);
+  const [loading, setLoading] = useState(false);
+  //console.log(geofence);
 
   useEffect(() => {
     const requestLocationPermission = async () => {
@@ -56,9 +72,12 @@ function App(): React.JSX.Element {
   }, []);
 
   const getCurrentLocation = () => {
-    Geolocation.getCurrentPosition(
-      position => {
-        const {latitude, longitude} = position.coords;
+    setLoading(true);
+    Geolocation.watchPosition(
+      info => {
+        console.log(info);
+        const {latitude, longitude} = info.coords;
+        console.log('dddd', latitude);
         const newRegion = {
           latitude,
           longitude,
@@ -70,14 +89,20 @@ function App(): React.JSX.Element {
           latitude,
           longitude,
         });
+        setGeofence({
+          latitude,
+          longitude,
+          radius: 200,
+        });
+        setLoading(false);
         if (mapRef.current) {
           mapRef.current.animateToRegion(newRegion, 1000);
         }
       },
       error => {
         console.log(error.code, error.message);
+        setLoading(false);
       },
-      {enableHighAccuracy: true, timeout: 15000, maximumAge: 10000},
     );
   };
 
@@ -119,16 +144,101 @@ function App(): React.JSX.Element {
         latitude: location.lat,
         longitude: location.lng,
       });
+      setGeofence({
+        latitude: location.lat,
+        longitude: location.lng,
+        radius: 1000,
+      });
       if (mapRef.current) {
         mapRef.current.animateToRegion(newRegion, 1000);
       }
     }
   };
+  // useEffect(() => {
+  //   if (isInsideGeofence()) {
+  //     console.log('Inside the geofence');
+  //   } else {
+  //     console.log('Outside the geofence');
+  //   }
+  // }, [marker]);
+
+  // const isInsideGeofence = () => {
+  //   if (marker) {
+  //     const distance = geolib.getDistance(
+  //       {latitude: marker.latitude, longitude: marker.longitude},
+  //       circleCenter,
+  //     );
+  //     return distance <= circleRadius;
+  //   }
+  //   return false;
+  // };
+
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3; // Earth radius in meters
+    const φ1 = (lat1 * Math.PI) / 180; // Convert latitudes to radians
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180; // Difference in latitudes
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180; // Difference in longitudes
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    const distance = R * c; // Distance in meters
+    return distance;
+  };
+
+  // Example usage:
+  const lat1 = circleCenter.latitude; // Latitude of circle center
+  const lon1 = circleCenter.longitude; // Longitude of circle center
+  const radius = circleRadius; // Radius of circle in meters
+
+  const lat2 = marker?.latitude; // Latitude of marker
+  const lon2 = marker?.longitude; // Longitude of marker
+
+  const distance = calculateDistance(lat1, lon1, lat2, lon2);
+
+  // Check if the marker is inside the circle
+  const isInsideCircle = distance <= radius;
+
+  console.log('Is inside circle:', isInsideCircle);
+
+  const isPointInPolygon = (point, polygon) => {
+    let x = point?.latitude,
+      y = point?.longitude;
+
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      let xi = polygon[i].latitude,
+        yi = polygon[i].longitude;
+      let xj = polygon[j].latitude,
+        yj = polygon[j].longitude;
+
+      let intersect =
+        yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+      if (intersect) inside = !inside;
+    }
+
+    return inside;
+  };
+
+  // Example usage:
+  const point = marker;
+  const polygon = [
+    {latitude: 30.744, longitude: 76.784},
+    {latitude: 30.7445, longitude: 76.7845},
+    {latitude: 30.744, longitude: 76.785},
+    {latitude: 30.7435, longitude: 76.7845},
+  ];
+
+  const isInsidePolygon = isPointInPolygon(point, polygon);
+  console.log('Is inside polygon:', isInsidePolygon);
 
   return (
     <SafeAreaView style={{flex: 1}}>
-      <StatusBar barStyle="dark-content" backgroundColor="red" />
-
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" />
+      <ActivityIndicator animating={loading} />
       <View style={styles.mapContainer}>
         <GooglePlacesAutocomplete
           placeholder="Enter an address"
@@ -152,7 +262,7 @@ function App(): React.JSX.Element {
           ref={mapRef}
           style={styles.map}
           region={region}
-          mapType="standard"
+          mapType="satellite"
           onRegionChangeComplete={setRegion}>
           {marker && (
             <Marker coordinate={marker}>
@@ -162,6 +272,20 @@ function App(): React.JSX.Element {
               />
             </Marker>
           )}
+          <Circle
+            center={{
+              latitude: circleCenter.latitude,
+              longitude: circleCenter.longitude,
+            }}
+            radius={circleRadius}
+            fillColor="rgba(255, 0, 0, 0.2)" // Red color with 50% opacity
+          />
+          <Polygon
+            coordinates={parray}
+            strokeColor="#000" // Outline color
+            fillColor="rgba(0, 200, 0, 0.5)" // Fill color with opacity
+            strokeWidth={1}
+          />
         </MapView>
         <View style={styles.buttonContainer}>
           <Button title="Zoom In" onPress={zoomIn} />
@@ -170,7 +294,7 @@ function App(): React.JSX.Element {
       </View>
     </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   mapContainer: {
