@@ -61,13 +61,13 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 200,
-    backgroundColor: '#F0A210',
+    backgroundColor: 'blue',
   },
   innerCircle: {
     width: '100%',
     height: '100%',
     borderRadius: 200,
-    backgroundColor: '#F0A210',
+    backgroundColor: 'blue',
     justifyContent: 'center',
   },
   innerText: {

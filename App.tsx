@@ -30,7 +30,7 @@ const circleSize = 20;
 const App = () => {
   const _mapView = useRef(null);
   const [marker, setMarker] = useState(null);
-  const [geofence, setGeofence] = useState(null);
+  const [search, setSearch] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const [scaleAnim] = useState(new Animated.Value(1)); // Initial scale value
@@ -141,11 +141,7 @@ const App = () => {
           latitude,
           longitude,
         });
-        setGeofence({
-          latitude,
-          longitude,
-          radius: 200,
-        });
+
         setLoading(false);
         if (_mapView.current) {
           _mapView.current.animateToRegion(newRegion, 1000);
@@ -231,16 +227,30 @@ const App = () => {
 
   // Example usage:
   const point = marker;
-  const polygon = [
-    {latitude: 30.744, longitude: 76.784},
-    {latitude: 30.7445, longitude: 76.7845},
-    {latitude: 30.744, longitude: 76.785},
-    {latitude: 30.7435, longitude: 76.7845},
-  ];
 
-  const isInsidePolygon = isPointInPolygon(point, polygon);
+  const isInsidePolygon = isPointInPolygon(point, parray);
   console.log('Is inside polygon:', isInsidePolygon);
 
+  const handlePlaceSelect = (data, details) => {
+    if (details) {
+      const location = details.geometry.location;
+      const newRegion = {
+        latitude: location.lat,
+        longitude: location.lng,
+        latitudeDelta: 0.01, // Adjust for better zoom level after selection
+        longitudeDelta: 0.01,
+      };
+      setRegion(newRegion);
+      setSearch({
+        latitude: location.lat,
+        longitude: location.lng,
+      });
+
+      if (mapRef.current) {
+        mapRef.current.animateToRegion(newRegion, 1000);
+      }
+    }
+  };
   return (
     <SafeAreaView style={styles.container}>
       <MapView
@@ -251,18 +261,21 @@ const App = () => {
         <Marker coordinate={FOOD} />
         <Marker coordinate={MOVIE} />
         <Marker coordinate={LEGO} />
-        <Marker coordinate={region}>
-          <View
-            style={{
-              //backgroundColor: 'red',
-              height: 20,
-              width: 20,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            <RippleEffect />
-          </View>
-        </Marker>
+        {marker !== null && (
+          <Marker coordinate={marker}>
+            <View
+              style={{
+                //backgroundColor: 'red',
+                height: 20,
+                width: 20,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <RippleEffect />
+            </View>
+          </Marker>
+        )}
+
         <Circle
           center={{
             latitude: circleCenter.latitude,
@@ -321,7 +334,8 @@ const styles = StyleSheet.create({
   },
   map: {
     ...StyleSheet.absoluteFillObject,
-    height: hp('80%'),
+    height: hp('100%'),
+    position: 'absolute',
   },
   bottomContainer: {
     flexDirection: 'column',
@@ -368,6 +382,30 @@ const styles = StyleSheet.create({
     height: 100,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  autocompleteContainer: {
+    position: 'absolute',
+    top: 10,
+    width: '100%',
+    zIndex: 1,
+  },
+  textInputContainer: {
+    width: '100%',
+    backgroundColor: 'transparent',
+    borderTopWidth: 0,
+    borderBottomWidth: 0,
+  },
+  textInput: {
+    height: 40,
+    backgroundColor: 'white',
+    fontSize: 18,
+    paddingLeft: 10,
+    borderRadius: 10,
+    color: 'black',
+  },
+  listView: {
+    backgroundColor: 'white',
+    zIndex: 2,
   },
 });
 
