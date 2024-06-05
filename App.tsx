@@ -22,7 +22,7 @@ Geocoder.init('AIzaSyDlnkg_c16HeGFpMk-Ey9l51ZGKIJnLDyA'); // Replace with your a
 
 const App = () => {
   //  30.740925, 76.778988
-
+  const [marker, setMarker] = useState(null);
   const circleCenter = {latitude: 30.740925, longitude: 76.778988}; // Circle center coordinates
   const circleRadius = 50;
   const parray = [
@@ -33,14 +33,8 @@ const App = () => {
   ];
   const mapRef = useRef(null);
 
-  const [region, setRegion] = useState({
-    latitude: 37.78825,
-    longitude: -122.4324,
-    latitudeDelta: 0.0922,
-    longitudeDelta: 0.0421,
-  });
+  const [region, setRegion] = useState(marker);
 
-  const [marker, setMarker] = useState(null);
   const [geofence, setGeofence] = useState(null);
   const [loading, setLoading] = useState(false);
   //console.log(geofence);
@@ -71,7 +65,7 @@ const App = () => {
     requestLocationPermission();
   }, []);
 
-  const getCurrentLocation = () => {
+  const getCurrentLocation = async () => {
     setLoading(true);
     Geolocation.watchPosition(
       info => {
@@ -202,7 +196,7 @@ const App = () => {
   // Check if the marker is inside the circle
   const isInsideCircle = distance <= radius;
 
-  console.log('Is inside circle:', isInsideCircle);
+  // console.log('Is inside circle:', isInsideCircle);
 
   const isPointInPolygon = (point, polygon) => {
     let x = point?.latitude,
@@ -233,36 +227,18 @@ const App = () => {
   ];
 
   const isInsidePolygon = isPointInPolygon(point, polygon);
-  console.log('Is inside polygon:', isInsidePolygon);
+  //console.log('Is inside polygon:', isInsidePolygon);
 
   return (
     <SafeAreaView style={{flex: 1}}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" />
       <ActivityIndicator animating={loading} />
       <View style={styles.mapContainer}>
-        <GooglePlacesAutocomplete
-          placeholder="Enter an address"
-          minLength={2}
-          autoFocus={false}
-          returnKeyType={'default'}
-          fetchDetails={true}
-          onPress={handlePlaceSelect}
-          query={{
-            key: 'AIzaSyDlnkg_c16HeGFpMk-Ey9l51ZGKIJnLDyA', // Replace with your actual Places API key
-            language: 'en',
-          }}
-          styles={{
-            container: styles.autocompleteContainer,
-            textInputContainer: styles.textInputContainer,
-            textInput: styles.textInput,
-            listView: styles.listView,
-          }}
-        />
         <MapView
           ref={mapRef}
           style={styles.map}
           region={region}
-          mapType="satellite"
+          mapType="standard"
           onRegionChangeComplete={setRegion}>
           {marker && (
             <Marker coordinate={marker}>
@@ -326,7 +302,6 @@ const styles = StyleSheet.create({
   },
   listView: {
     backgroundColor: 'white',
-    zIndex: 2,
   },
   buttonContainer: {
     flexDirection: 'row',
