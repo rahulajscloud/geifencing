@@ -1,28 +1,90 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useRef, useState, useEffect} from 'react';
 import {
-  SafeAreaView,
-  StatusBar,
   StyleSheet,
+  Text,
   View,
-  Button,
-  Image,
-  PermissionsAndroid,
+  TouchableOpacity,
+  SafeAreaView,
   Platform,
-  ActivityIndicator,
+  PermissionsAndroid,
+  Animated,
+  Easing,
 } from 'react-native';
-import MapView, {Circle, Marker, Polygon} from 'react-native-maps';
-
+import MapView, {
+  PROVIDER_GOOGLE,
+  Circle,
+  Marker,
+  Polygon,
+} from 'react-native-maps';
+import {
+  widthPercentageToDP as wp,
+  heightPercentageToDP as hp,
+} from 'react-native-responsive-screen';
 import Geocoder from 'react-native-geocoding';
 import Geolocation from '@react-native-community/geolocation';
 import {GooglePlacesAutocomplete} from 'react-native-google-places-autocomplete';
 import geolib from 'geolib';
+import RippleEffect from './src/components/ripple';
 
-// Initialize Geocoder with your API key
-Geocoder.init('AIzaSyDlnkg_c16HeGFpMk-Ey9l51ZGKIJnLDyA'); // Replace with your actual Geocoding API key
-
+const circleSize = 20;
 const App = () => {
-  //  30.740925, 76.778988
+  const _mapView = useRef(null);
   const [marker, setMarker] = useState(null);
+  const [geofence, setGeofence] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const [scaleAnim] = useState(new Animated.Value(1)); // Initial scale value
+
+  useEffect(() => {
+    const pulse = () => {
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 2, // Scale up animation
+          duration: 1000, // Duration of the animation
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true, // Use native driver for better performance
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1, // Reset animation
+          duration: 0, // Instantly
+          useNativeDriver: true,
+        }),
+      ]).start(pulse); // Repeat animation
+    };
+
+    pulse(); // Start animation sequence
+
+    return () => {
+      scaleAnim.stopAnimation();
+    };
+  }, [scaleAnim]);
+
+  const circleSize = 20;
+
+  const [region, setRegion] = useState({
+    latitude: 43.8012,
+    longitude: -79.1902,
+    latitudeDelta: 0.025,
+    longitudeDelta: 0.025,
+  });
+  const FOOD = {
+    latitude: 43.8112,
+    longitude: -79.1902,
+    latitudeDelta: 0.025,
+    longitudeDelta: 0.025,
+  };
+  const MOVIE = {
+    latitude: 43.9242,
+    longitude: -79.1903,
+    latitudeDelta: 0.025,
+    longitudeDelta: 0.025,
+  };
+  const LEGO = {
+    latitude: 44.0012,
+    longitude: -79.1902,
+    latitudeDelta: 0.025,
+    longitudeDelta: 0.025,
+  };
   const circleCenter = {latitude: 30.740925, longitude: 76.778988}; // Circle center coordinates
   const circleRadius = 50;
   const parray = [
@@ -31,13 +93,9 @@ const App = () => {
     {latitude: 30.744, longitude: 76.785},
     {latitude: 30.7435, longitude: 76.7845},
   ];
-  const mapRef = useRef(null);
-
-  const [region, setRegion] = useState(marker);
-
-  const [geofence, setGeofence] = useState(null);
-  const [loading, setLoading] = useState(false);
-  //console.log(geofence);
+  const _showLocation = location => {
+    _mapView.current.animateToRegion(location, 1500);
+  };
 
   useEffect(() => {
     const requestLocationPermission = async () => {
@@ -89,83 +147,37 @@ const App = () => {
           radius: 200,
         });
         setLoading(false);
-        if (mapRef.current) {
-          mapRef.current.animateToRegion(newRegion, 1000);
+        if (_mapView.current) {
+          _mapView.current.animateToRegion(newRegion, 1000);
         }
       },
       error => {
         console.log(error.code, error.message);
         setLoading(false);
       },
+      {
+        interval: 10000,
+        fastestInterval: 5000,
+        distanceFilter: 50,
+      },
     );
   };
 
-  const zoomIn = () => {
-    const newRegion = {
+  const _zoomIn = () => {
+    setRegion({
       ...region,
-      latitudeDelta: region.latitudeDelta / 2,
-      longitudeDelta: region.longitudeDelta / 2,
-    };
-    setRegion(newRegion);
-    if (mapRef.current) {
-      mapRef.current.animateToRegion(newRegion, 1000);
-    }
+      latitudeDelta: 0.015,
+      longitudeDelta: 0.015,
+    });
   };
 
-  const zoomOut = () => {
-    const newRegion = {
+  const _zoomOut = () => {
+    setRegion({
       ...region,
-      latitudeDelta: region.latitudeDelta * 2,
-      longitudeDelta: region.longitudeDelta * 2,
-    };
-    setRegion(newRegion);
-    if (mapRef.current) {
-      mapRef.current.animateToRegion(newRegion, 1000);
-    }
+      latitudeDelta: 0.35,
+      longitudeDelta: 0.35,
+    });
   };
-
-  const handlePlaceSelect = (data, details) => {
-    if (details) {
-      const location = details.geometry.location;
-      const newRegion = {
-        latitude: location.lat,
-        longitude: location.lng,
-        latitudeDelta: 0.01, // Adjust for better zoom level after selection
-        longitudeDelta: 0.01,
-      };
-      setRegion(newRegion);
-      setMarker({
-        latitude: location.lat,
-        longitude: location.lng,
-      });
-      setGeofence({
-        latitude: location.lat,
-        longitude: location.lng,
-        radius: 1000,
-      });
-      if (mapRef.current) {
-        mapRef.current.animateToRegion(newRegion, 1000);
-      }
-    }
-  };
-  // useEffect(() => {
-  //   if (isInsideGeofence()) {
-  //     console.log('Inside the geofence');
-  //   } else {
-  //     console.log('Outside the geofence');
-  //   }
-  // }, [marker]);
-
-  // const isInsideGeofence = () => {
-  //   if (marker) {
-  //     const distance = geolib.getDistance(
-  //       {latitude: marker.latitude, longitude: marker.longitude},
-  //       circleCenter,
-  //     );
-  //     return distance <= circleRadius;
-  //   }
-  //   return false;
-  // };
 
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371e3; // Earth radius in meters
@@ -196,7 +208,7 @@ const App = () => {
   // Check if the marker is inside the circle
   const isInsideCircle = distance <= radius;
 
-  // console.log('Is inside circle:', isInsideCircle);
+  console.log('Is inside circle:', isInsideCircle);
 
   const isPointInPolygon = (point, polygon) => {
     let x = point?.latitude,
@@ -227,45 +239,75 @@ const App = () => {
   ];
 
   const isInsidePolygon = isPointInPolygon(point, polygon);
-  //console.log('Is inside polygon:', isInsidePolygon);
+  console.log('Is inside polygon:', isInsidePolygon);
 
   return (
-    <SafeAreaView style={{flex: 1}}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" />
-      <ActivityIndicator animating={loading} />
-      <View style={styles.mapContainer}>
-        <MapView
-          ref={mapRef}
-          style={styles.map}
-          region={region}
-          mapType="standard"
-          onRegionChangeComplete={setRegion}>
-          {marker && (
-            <Marker coordinate={marker}>
-              <Image
-                source={require('./src/assets/place.png')} // Ensure the path is correct
-                style={styles.customMarker}
-              />
-            </Marker>
-          )}
-          <Circle
-            center={{
-              latitude: circleCenter.latitude,
-              longitude: circleCenter.longitude,
-            }}
-            radius={circleRadius}
-            fillColor="rgba(255, 0, 0, 0.2)" // Red color with 50% opacity
-          />
-          <Polygon
-            coordinates={parray}
-            strokeColor="#000" // Outline color
-            fillColor="rgba(0, 200, 0, 0.5)" // Fill color with opacity
-            strokeWidth={1}
-          />
-        </MapView>
-        <View style={styles.buttonContainer}>
-          <Button title="Zoom In" onPress={zoomIn} />
-          <Button title="Zoom Out" onPress={zoomOut} />
+    <SafeAreaView style={styles.container}>
+      <MapView
+        ref={_mapView}
+        provider={PROVIDER_GOOGLE}
+        region={region}
+        style={styles.map}>
+        <Marker coordinate={FOOD} />
+        <Marker coordinate={MOVIE} />
+        <Marker coordinate={LEGO} />
+        <Marker coordinate={region}>
+          <View
+            style={{
+              //backgroundColor: 'red',
+              height: 20,
+              width: 20,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <RippleEffect />
+          </View>
+        </Marker>
+        <Circle
+          center={{
+            latitude: circleCenter.latitude,
+            longitude: circleCenter.longitude,
+          }}
+          radius={circleRadius}
+          fillColor="rgba(255, 0, 0, 0.2)" // Red color with 50% opacity
+        />
+        <Polygon
+          coordinates={parray}
+          strokeColor="#000" // Outline color
+          fillColor="rgba(0, 200, 0, 0.5)" // Fill color with opacity
+          strokeWidth={1}
+        />
+      </MapView>
+      <View style={styles.bottomContainer}>
+        <View style={styles.btnContainer}>
+          <TouchableOpacity
+            style={styles.btn}
+            onPress={() => _showLocation(FOOD)}>
+            <Text style={styles.btnText}>FOOD</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.btn}
+            onPress={() => _showLocation(MOVIE)}>
+            <Text style={styles.btnText}>MOVIE</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.btn}
+            onPress={() => _showLocation(LEGO)}>
+            <Text style={styles.btnText}>LEGO</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.btnContainer}>
+          <TouchableOpacity style={styles.btn} onPress={_zoomIn}>
+            <Text style={styles.btnText}>ZOOMIN</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.btn} onPress={_zoomOut}>
+            <Text style={styles.btnText}>ZOOMOUT</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.btn}
+            onPress={() => _showLocation(region)}>
+            <Text style={styles.btnText}>curent</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>
@@ -273,51 +315,59 @@ const App = () => {
 };
 
 const styles = StyleSheet.create({
-  mapContainer: {
+  container: {
     flex: 1,
-    zIndex: 0,
+    flexDirection: 'column',
   },
   map: {
     ...StyleSheet.absoluteFillObject,
+    height: hp('80%'),
   },
-  autocompleteContainer: {
-    position: 'absolute',
-    top: 10,
-    width: '100%',
-    zIndex: 1,
+  bottomContainer: {
+    flexDirection: 'column',
+    width: wp('100%'),
+    marginTop: hp('82%'),
   },
-  textInputContainer: {
-    width: '100%',
-    backgroundColor: 'transparent',
-    borderTopWidth: 0,
-    borderBottomWidth: 0,
-  },
-  textInput: {
-    height: 40,
-    backgroundColor: 'white',
-    fontSize: 18,
-    paddingLeft: 10,
-    borderRadius: 10,
-    color: 'black',
-  },
-  listView: {
-    backgroundColor: 'white',
-  },
-  buttonContainer: {
+  btnContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    position: 'absolute',
-    bottom: 20,
-    left: '25%',
-    right: '25%',
-    backgroundColor: 'rgba(255, 255, 255, 0.7)', // Background color to make buttons more visible
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
+    marginTop: hp('3%'),
   },
-  customMarker: {
-    width: 50,
-    height: 50,
+  btn: {
+    width: wp('30%'),
+    marginLeft: wp('8%'),
+  },
+  btnText: {
+    color: 'red',
+  },
+  markerContainer: {
+    width: 20,
+    height: 20,
+    borderRadius: 10, // Half of width or height to create a circle
+    borderColor: 'blue', // Border color
+  },
+  circle: {
+    position: 'absolute',
+    width: circleSize,
+    height: circleSize,
+    borderRadius: circleSize / 2,
+    backgroundColor: 'blue',
+    opacity: 0.3, // Adjust the opacity of the expanding circle
+  },
+  innerCircle: {
+    position: 'absolute',
+    width: circleSize,
+    height: circleSize,
+    borderRadius: circleSize / 2,
+    backgroundColor: 'blue',
+    top: 5,
+    left: 5, // Adjust the color of the inner circle
+  },
+  markerContainer1: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
